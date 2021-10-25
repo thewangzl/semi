@@ -13,15 +13,14 @@ public class RpcUtils {
         if(ref.getArgs().length >= 1 && StringUtils.hasText(ref.getArgs()[0])){
             args = new Object[ref.getArgs().length + 1];
             System.arraycopy(ref.getArgs(),0,args,1,ref.getArgs().length);
-            args[0] = firstValue;
         }else{
             args = new Object[1];
-            args[0] = firstValue;
         }
+        args[0] = firstValue;
         return args;
     }
     
-    public static Collection instanceCollectionArgument(Method method){
+    public static Collection<?> instanceCollectionArgument(Method method){
         Class<?>[] types = method.getParameterTypes();
         if(types.length == 0){
             return new HashSet();

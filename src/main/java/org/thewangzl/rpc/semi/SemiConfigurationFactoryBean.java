@@ -1,9 +1,10 @@
 package org.thewangzl.rpc.semi;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -14,11 +15,15 @@ import org.springframework.core.type.classreading.CachingMetadataReaderFactory;
 import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.StringUtils;
 import org.thewangzl.rpc.semi.annotation.RefKey;
 import org.thewangzl.rpc.semi.annotation.SemiBean;
 import org.thewangzl.rpc.semi.annotation.SemiProperty;
+import org.thewangzl.rpc.semi.type.WrappedType;
+import org.thewangzl.rpc.semi.util.ReflectUtil;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
@@ -27,28 +32,38 @@ import java.util.Set;
 
 import static org.springframework.util.StringUtils.tokenizeToStringArray;
 
-public class SemiBeanRegistryFactoryBean implements InitializingBean, ApplicationContextAware, FactoryBean<SemiBeanRegistry> {
+public class SemiConfigurationFactoryBean implements InitializingBean, ApplicationContextAware, FactoryBean<SemiConfiguration> {
+
+    private static Logger log = LoggerFactory.getLogger(SemiConfigurationFactoryBean.class);
 
     private static final ResourcePatternResolver RESOURCE_PATTERN_RESOLVER = new PathMatchingResourcePatternResolver();
     private static final MetadataReaderFactory METADATA_READER_FACTORY = new CachingMetadataReaderFactory();
 
     private ApplicationContext applicationContext;
 
-    @Value("${semi.deal-package}")
-    private String dealPackage;
+    private SemiConfiguration configuration;
 
-    private SemiBeanRegistry semiBeanRegistry;
+    private String semiBeanPackage;
 
-    private void build(String dealPackage)  {
-        semiBeanRegistry = new SemiBeanRegistry();
-        Set<Class> classes = scanClass(dealPackage);
+    private String typeHandlersPackage;
+
+    private void build()  {
+        configuration = new SemiConfiguration();
+        Set<Class> classes = scanClass(semiBeanPackage,SemiBean.class);
         for(Class clazz : classes){
             Set<Ref> refs = this.resolveRef(clazz);
-            semiBeanRegistry.put(clazz, refs);
+            configuration.getSemiBeanRegistry().put(clazz.getName(), refs);
+        }
+        if(StringUtils.hasText(typeHandlersPackage)) {
+            classes = scanClass(typeHandlersPackage, WrappedType.class);
+            for(Class clazz : classes){
+                configuration.getTypeHandlerRegistry().register(clazz);
+            }
+
         }
     }
 
-    private Set<Class> scanClass(String dealPackage){
+    private Set<Class> scanClass(String dealPackage,Class<? extends Annotation> assignableType){
         Set<Class> classes = new HashSet<>();
         String[] packagePatternArray = tokenizeToStringArray(dealPackage, ConfigurableApplicationContext.CONFIG_LOCATION_DELIMITERS);
         try {
@@ -58,15 +73,15 @@ public class SemiBeanRegistryFactoryBean implements InitializingBean, Applicatio
                 for (Resource resource : resources) {
                     MetadataReader metadataReader = METADATA_READER_FACTORY.getMetadataReader(resource);
                     Class<?> clazz = ClassUtils.getDefaultClassLoader().loadClass(metadataReader.getClassMetadata().getClassName());
-                    if (clazz.isAnnotationPresent(SemiBean.class)) {
+                    if (clazz.isAnnotationPresent(assignableType)) {
                         classes.add(clazz);
                     }
                 }
             }
         }catch (IOException e){
-            System.err.println(e.getMessage());
+            log.error(e.getMessage());
         }catch (ClassNotFoundException e){
-            System.err.println(e.getMessage());
+            log.error(e.getMessage());
         }
         return classes;
     }
@@ -90,8 +105,12 @@ public class SemiBeanRegistryFactoryBean implements InitializingBean, Applicatio
                 ref.setMethod(method);
                 ref.setListMethod(listMethod);
                 ref.setArgs(semiField.args());
-                Type refType = field.getType();
-                Class<?> refClass = ClassUtils.getDefaultClassLoader().loadClass(refType.getTypeName());
+                Type type = ReflectUtil.getActualType(field.getType()); field.getType();
+                if(type == null){
+                    log.error(clazz.getName() +"."+ field.getName()+" not support");
+                    continue;
+                }
+                Class<?> refClass = ClassUtils.getDefaultClassLoader().loadClass(type.getTypeName());
                 Field[] refTypeFields = refClass.getDeclaredFields();
                 for (Field refTypeField : refTypeFields) {
                     RefKey refKey = refTypeField.getAnnotation(RefKey.class);
@@ -103,7 +122,7 @@ public class SemiBeanRegistryFactoryBean implements InitializingBean, Applicatio
                 refs.add(ref);
             }
         }catch (ClassNotFoundException e){
-            System.err.println(e.getMessage());
+            log.error(e.getMessage());
         }
         return refs;
     }
@@ -122,25 +141,32 @@ public class SemiBeanRegistryFactoryBean implements InitializingBean, Applicatio
     }
 
     @Override
-    public void afterPropertiesSet() throws Exception {
-        this.build(this.dealPackage);
+    public void afterPropertiesSet() {
+        if(this.semiBeanPackage == null){
+            log.error("semiBeanPackage not set");
+            return;
+        }
+        this.build();
     }
 
-    public void setDealPackage(String dealPackage) {
-        this.dealPackage = dealPackage;
+    public void setSemiBeanPackage(String semiBeanPackage) {
+        this.semiBeanPackage = semiBeanPackage;
+    }
+
+    public void setTypeHandlersPackage(String typeHandlersPackage) {
+        this.typeHandlersPackage = typeHandlersPackage;
     }
 
     @Override
-    public SemiBeanRegistry getObject() throws Exception {
-        if(semiBeanRegistry == null){
+    public SemiConfiguration getObject(){
+        if(configuration == null){
             this.afterPropertiesSet();
         }
-        return semiBeanRegistry;
+        return configuration;
     }
 
-
     @Override
-    public Class<? extends SemiBeanRegistry> getObjectType() {
-        return semiBeanRegistry == null ? SemiBeanRegistry.class : semiBeanRegistry.getClass();
+    public Class<? extends SemiConfiguration> getObjectType() {
+        return configuration == null ? SemiConfiguration.class : configuration.getClass();
     }
 }

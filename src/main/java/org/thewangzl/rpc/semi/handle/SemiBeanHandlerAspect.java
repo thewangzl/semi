@@ -6,21 +6,19 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Component;
-import org.thewangzl.rpc.semi.SemiBeanRegistry;
+import org.thewangzl.rpc.semi.SemiConfiguration;
+import org.thewangzl.rpc.semi.type.TypeHandler;
 
 import java.util.Collection;
 
-
 @Aspect
-@Component
 public class SemiBeanHandlerAspect {
 
     @Autowired
     private ApplicationContext context;
 
     @Autowired
-    private SemiBeanRegistry semiBeanRegistry;
+    private SemiConfiguration configuration;
 
     @Pointcut("@annotation(org.thewangzl.rpc.semi.annotation.SemiBeanHandler)")
     public void pointcut(){}
@@ -28,11 +26,14 @@ public class SemiBeanHandlerAspect {
     @Around("pointcut()")
     public Object around(ProceedingJoinPoint proceedingJoinPoint) throws Throwable {
         Object result = proceedingJoinPoint.proceed();
-        if(result instanceof Collection){
-            new SemiBean4CollectionProcessor(semiBeanRegistry, context).process((Collection) result);
+        TypeHandler typeHandler = configuration.getTypeHandlerRegistry().getHandler(result);
+        Object realData = typeHandler.getData(result);
+        if(realData instanceof Collection){
+            new SemiBean4CollectionProcessor(configuration.getSemiBeanRegistry(), context).process((Collection) realData);
         }else{
-            new SemiBeanProcessor(semiBeanRegistry, context).process(result);
+            new SemiBeanProcessor(configuration.getSemiBeanRegistry(), context).process(realData);
         }
+        typeHandler.setData(result, realData);
         return result;
     }
 

@@ -21,53 +21,59 @@ public class SemiBean4CollectionProcessor {
         this.context = context;
     }
 
-    public void process(Collection list) throws IllegalAccessException, InvocationTargetException {
-        Map<Ref,Collection> ids = new HashMap<>();
-        for(Object data : list) {
-            Set<Ref> refs = semiBeanRegistry.get(data.getClass());
-            BeanWrapper beanWrapper = new BeanWrapperImpl(data);
-            for (Ref ref : refs) {
-                Object key = beanWrapper.getPropertyValue(ref.getField());
-                if (key instanceof Collection) {
-                    Collection refKeyValues =RpcUtils.instanceCollectionArgument(ref.getListMethod());
-                    for (Object o : (Collection) key) {
-                        BeanWrapper keyWrapper = new BeanWrapperImpl(o);
-                        Object v = keyWrapper.getPropertyValue(ref.getRefKey());
-                        refKeyValues.add(v);
-                    }
-                    ids.putIfAbsent(ref,new HashSet());
-                    ids.get(ref).addAll(refKeyValues);
-                } else {
-                    BeanWrapper keyWrapper = new BeanWrapperImpl(key);
-                    Object refKeyVal = keyWrapper.getPropertyValue(ref.getRefKey());
-                    ids.putIfAbsent(ref,RpcUtils.instanceCollectionArgument(ref.getListMethod()));
-                    ids.get(ref).add(refKeyVal);
+    public void process(Collection<?> domains) throws IllegalAccessException, InvocationTargetException {
+        Set<Ref> refs = semiBeanRegistry.get(domains.iterator().next().getClass().getName());
+        if(refs== null){
+            return;
+        }
+        for (Ref ref : refs) {
+            Collection ids = getRefIds(domains, ref);
+            Object feign = context.getBean(ref.getRpcClass());
+            Object[] args = RpcUtils.buildRpcMethodArgs(ref, ids);
+            Collection refValues = (Collection) ref.getListMethod().invoke(feign, args);
+            this.setRef(domains,ref, refValues);
+        }
+    }
+
+    private Collection getRefIds(Collection<?> domains, Ref ref) {
+        Collection ids = RpcUtils.instanceCollectionArgument(ref.getListMethod());
+        for(Object domain : domains) {
+            BeanWrapper beanWrapper = new BeanWrapperImpl(domain);
+            Object key = beanWrapper.getPropertyValue(ref.getField());
+            if (key instanceof Collection) {
+                for (Object o : (Collection) key) {
+                    BeanWrapper refWrapper = new BeanWrapperImpl(o);
+                    Object v = refWrapper.getPropertyValue(ref.getRefKey());
+                    ids.add(v);
                 }
+            } else {
+                BeanWrapper refWrapper = new BeanWrapperImpl(key);
+                Object refKeyVal = refWrapper.getPropertyValue(ref.getRefKey());
+                ids.add(refKeyVal);
             }
         }
-        for(Map.Entry<Ref,Collection> entry: ids.entrySet()){
-            Object feign = context.getBean(entry.getKey().getRpcClass());
-            Object[] args = RpcUtils.buildRpcMethodArgs(entry.getKey(), entry.getValue());
-            Collection values = (Collection) entry.getKey().getListMethod().invoke(feign, args);
-            Map resultMap = CollectionUtil.convert2Map(values, entry.getKey().getRefKey());
-            String field = entry.getKey().getField();
-            for(Object data : list) {
-                BeanWrapper wrapper = new BeanWrapperImpl(data);
-                Object propertyValue = wrapper.getPropertyValue(entry.getKey().getField());
-                if (propertyValue instanceof Collection) {
-                    Collection newValues = CollectionUtil.instance(propertyValue.getClass());
-                    for(Object obj : (Collection) propertyValue){
-                        BeanWrapper propertyValueWrapper = new BeanWrapperImpl(obj);
-                        Object v = resultMap.get(propertyValueWrapper.getPropertyValue(entry.getKey().getRefKey()));
-                        if(v != null) {
-                            newValues.add(v);
-                        }
+        return ids;
+    }
+
+    private void setRef(Collection domains, Ref ref,Collection refValues){
+        Map<?,?> refMap = CollectionUtil.convert2Map(refValues, ref.getRefKey());
+        String field = ref.getField();
+        for(Object domain : domains) {
+            BeanWrapper wrapper = new BeanWrapperImpl(domain);
+            Object propertyValue = wrapper.getPropertyValue(ref.getField());
+            if (propertyValue instanceof Collection) {
+                Collection newValues = CollectionUtil.instance(propertyValue.getClass());
+                for(Object obj : (Collection) propertyValue){
+                    BeanWrapper propertyValueWrapper = new BeanWrapperImpl(obj);
+                    Object v = refMap.get(propertyValueWrapper.getPropertyValue(ref.getRefKey()));
+                    if(v != null){
+                        newValues.add(v);
                     }
-                    wrapper.setPropertyValue(field,newValues);
-                }else if(propertyValue.getClass().getName().equals(entry.getKey().getRefClass())){
-                    BeanWrapper propertyValueWrapper = new BeanWrapperImpl(propertyValue);
-                    wrapper.setPropertyValue(field, resultMap.get(propertyValueWrapper.getPropertyValue(entry.getKey().getRefKey())));
                 }
+                wrapper.setPropertyValue(field,newValues);
+            }else if(propertyValue.getClass().getName().equals(ref.getRefClass())){
+                BeanWrapper propertyValueWrapper = new BeanWrapperImpl(propertyValue);
+                wrapper.setPropertyValue(field, refMap.get(propertyValueWrapper.getPropertyValue(ref.getRefKey())));
             }
         }
     }

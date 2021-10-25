@@ -67,4 +67,5 @@ public class Ref {
     public void setRefKey(String refKey) {
         this.refKey = refKey;
     }
+
 }

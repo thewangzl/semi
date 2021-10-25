@@ -3,7 +3,6 @@ package org.thewangzl.rpc.semi.util;
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
 
-import java.lang.reflect.Method;
 import java.util.*;
 
 public class CollectionUtil {
