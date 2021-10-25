@@ -35,6 +35,9 @@ public class SemiBeanProcessor {
     private void setRef(BeanWrapper beanWrapper,Ref ref) throws IllegalAccessException, InvocationTargetException {
         Object feign = context.getBean(ref.getRpcClass());
         Object value = beanWrapper.getPropertyValue(ref.getField());
+        if(value == null){
+            return;
+        }
         if(value instanceof Collection){
             Collection refKeyValues = getRefIds(ref, (Collection) value);
             Object[] args = RpcUtils.buildRpcMethodArgs(ref, refKeyValues);

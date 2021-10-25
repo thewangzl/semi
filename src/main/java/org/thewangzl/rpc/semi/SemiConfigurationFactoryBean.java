@@ -105,19 +105,26 @@ public class SemiConfigurationFactoryBean implements InitializingBean, Applicati
                 ref.setMethod(method);
                 ref.setListMethod(listMethod);
                 ref.setArgs(semiField.args());
-                Type type = ReflectUtil.getActualType(field.getType()); field.getType();
+                Type type = ReflectUtil.getActualType(field.getGenericType());
                 if(type == null){
                     log.error(clazz.getName() +"."+ field.getName()+" not support");
                     continue;
                 }
                 Class<?> refClass = ClassUtils.getDefaultClassLoader().loadClass(type.getTypeName());
                 Field[] refTypeFields = refClass.getDeclaredFields();
+                boolean found = false;
                 for (Field refTypeField : refTypeFields) {
                     RefKey refKey = refTypeField.getAnnotation(RefKey.class);
                     if (refKey != null) {
                         ref.setRefClass(field.getGenericType().getTypeName());
                         ref.setRefKey(refTypeField.getName());
+                        found = true;
+                        break;
                     }
+                }
+                if(!found){
+                    log.error(clazz.getName() +"."+ field.getName() +"not found refKey.");
+                    continue;
                 }
                 refs.add(ref);
             }

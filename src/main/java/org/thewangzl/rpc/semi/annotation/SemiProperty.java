@@ -11,7 +11,7 @@ public @interface SemiProperty {
     String rpcListMethod();
 
     /**
-     * RPC调用时需要的其他参数，从第二个参数开始
+     * other arguments when invoke rpc, begin with the second argument
      * @return
      */
     String[] args() default "";

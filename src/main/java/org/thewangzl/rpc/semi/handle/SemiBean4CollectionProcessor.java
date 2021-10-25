@@ -61,6 +61,9 @@ public class SemiBean4CollectionProcessor {
         for(Object domain : domains) {
             BeanWrapper wrapper = new BeanWrapperImpl(domain);
             Object propertyValue = wrapper.getPropertyValue(ref.getField());
+            if(propertyValue == null){
+                continue;
+            }
             if (propertyValue instanceof Collection) {
                 Collection newValues = CollectionUtil.instance(propertyValue.getClass());
                 for(Object obj : (Collection) propertyValue){
