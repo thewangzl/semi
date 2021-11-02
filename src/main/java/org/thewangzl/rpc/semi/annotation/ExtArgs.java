@@ -5,11 +5,7 @@ import java.lang.annotation.*;
 @Documented
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface RefKey {
+public @interface ExtArgs {
+    ExtArg[] value() default {};
 
-    /**
-     * id index in rpc method
-     * @return
-     */
-    int index() default 0;
 }

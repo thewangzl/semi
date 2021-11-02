@@ -1,16 +1,19 @@
 package org.thewangzl.rpc.semi;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Ref {
 
     private String field;
-    private String rpcClass;
+    private Class<?> rpcClass;
     private Method method;
     private Method listMethod;
-    private String[] args;
+    private List<ArgMapping> args = new ArrayList<>();
     private String refClass;
     private String refKey;
+    private int refKeyIndex;
 
     public String getField() {
         return field;
@@ -20,11 +23,11 @@ public class Ref {
         this.field = field;
     }
 
-    public String getRpcClass() {
+    public Class<?> getRpcClass() {
         return rpcClass;
     }
 
-    public void setRpcClass(String rpcClass) {
+    public void setRpcClass(Class<?> rpcClass) {
         this.rpcClass = rpcClass;
     }
 
@@ -44,12 +47,16 @@ public class Ref {
         this.listMethod = listMethod;
     }
 
-    public String[] getArgs() {
+    public List<ArgMapping> getArgs() {
         return args;
     }
 
-    public void setArgs(String[] args) {
+    public void setArgs(List<ArgMapping> args) {
         this.args = args;
+    }
+
+    public void addArg(ArgMapping arg){
+        this.args.add(arg);
     }
 
     public String getRefClass() {
@@ -68,4 +75,10 @@ public class Ref {
         this.refKey = refKey;
     }
 
+    public int getRefKeyIndex() {
+        return refKeyIndex;
+    }
+    public void setRefKeyIndex(int refKeyIndex) {
+        this.refKeyIndex = refKeyIndex;
+    }
 }

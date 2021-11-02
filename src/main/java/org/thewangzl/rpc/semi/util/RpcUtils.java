@@ -1,31 +1,25 @@
 package org.thewangzl.rpc.semi.util;
 
-import org.springframework.util.StringUtils;
-import org.thewangzl.rpc.semi.Ref;
+import org.springframework.core.convert.ConversionService;
+import org.thewangzl.rpc.semi.ArgMapping;
 
-import java.lang.reflect.Method;
 import java.util.*;
 
 public class RpcUtils {
 
-    public static Object[] buildRpcMethodArgs(Ref ref, Object firstValue) {
-        Object[] args;
-        if(ref.getArgs().length >= 1 && StringUtils.hasText(ref.getArgs()[0])){
-            args = new Object[ref.getArgs().length + 1];
-            System.arraycopy(ref.getArgs(),0,args,1,ref.getArgs().length);
+    public static Object[] buildRpcMethodArgs(ConversionService conversionService, List<ArgMapping> argMappings, Class<?>[] parameterTypes, int keyIndex, Object refKey) {
+        Object[] result;
+        if(argMappings.size() >= 1){
+            result = new Object[argMappings.size() + 1];
+            for (ArgMapping argMapping : argMappings){
+                result[argMapping.getIndex()] = conversionService.convert(argMapping.getValue(),parameterTypes[argMapping.getIndex()]);
+            }
+            result[keyIndex] = refKey;
         }else{
-            args = new Object[1];
+            result = new Object[1];
+            result[0] = refKey;
         }
-        args[0] = firstValue;
-        return args;
+        return result;
     }
-    
-    public static Collection<?> instanceCollectionArgument(Method method){
-        Class<?>[] types = method.getParameterTypes();
-        if(types.length == 0){
-            return new HashSet();
-        }
-        return CollectionUtil.instance(types[0]);
-    }
-    
+
 }

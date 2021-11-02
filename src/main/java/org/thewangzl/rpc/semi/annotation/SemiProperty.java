@@ -6,7 +6,7 @@ import java.lang.annotation.*;
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SemiProperty {
-    String rpcClass();
+    Class<?> rpcClass();
     String rpcMethod();
     String rpcListMethod();
 
@@ -14,5 +14,5 @@ public @interface SemiProperty {
      * other arguments when invoke rpc, begin with the second argument
      * @return
      */
-    String[] args() default "";
+    String[] args() default {};
 }

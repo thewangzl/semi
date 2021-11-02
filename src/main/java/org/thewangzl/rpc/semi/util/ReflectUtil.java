@@ -4,6 +4,12 @@ import java.lang.reflect.*;
 
 public class ReflectUtil {
 
+    /**
+     * 获取Type
+     * 例:List<T> 中 T.
+     * @param type
+     * @return
+     */
     public static Type getActualType(Type type) {
         if (type instanceof Class) {
             return type;

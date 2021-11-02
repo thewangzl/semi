@@ -3,11 +3,10 @@ package org.thewangzl.rpc.semi.type;
 /**
  *
  * @param <S>
+ * @param <T>
  */
-public interface TypeHandler<S> {
-     Object getData(S wrapper);
+public interface TypeHandler<S,T> {
+     T unwrap(S wrapper);
 
-      default void setData(S wrapper, Object fullBean){
-
-      };
+     void rewrap(S wrapper, T fullBean);
 }

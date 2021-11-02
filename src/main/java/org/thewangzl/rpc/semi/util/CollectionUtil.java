@@ -3,11 +3,15 @@ package org.thewangzl.rpc.semi.util;
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
 
+import java.lang.reflect.Method;
 import java.util.*;
 
+/**
+ *
+ */
 public class CollectionUtil {
 
-    public static Map convert2Map(Collection collection,String keyProperty){
+    public static Map convert2Map(Collection<?> collection,String keyProperty){
         Map resultMap = new HashMap();
         if(collection != null) {
             BeanWrapper wrapper;
@@ -27,7 +31,21 @@ public class CollectionUtil {
         }else if (clazz.equals(Set.class)){
             return new HashSet();
         }else {
+            try {
+                return (Collection)clazz.newInstance();
+            } catch (InstantiationException e) {
+
+            } catch (IllegalAccessException e) {
+            }
+            return null;
+        }
+    }
+
+    public static Collection<?> instanceCollectionArgument(Method method){
+        Class<?>[] types = method.getParameterTypes();
+        if(types.length == 0){
             return new HashSet();
         }
+        return CollectionUtil.instance(types[0]);
     }
 }

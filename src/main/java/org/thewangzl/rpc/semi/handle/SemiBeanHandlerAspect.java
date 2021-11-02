@@ -6,6 +6,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.convert.ConversionService;
 import org.thewangzl.rpc.semi.SemiConfiguration;
 import org.thewangzl.rpc.semi.type.TypeHandler;
 
@@ -18,6 +19,9 @@ public class SemiBeanHandlerAspect {
     private ApplicationContext context;
 
     @Autowired
+    private ConversionService conversionService;
+
+    @Autowired
     private SemiConfiguration configuration;
 
     @Pointcut("@annotation(org.thewangzl.rpc.semi.annotation.SemiBeanHandler)")
@@ -27,13 +31,13 @@ public class SemiBeanHandlerAspect {
     public Object around(ProceedingJoinPoint proceedingJoinPoint) throws Throwable {
         Object result = proceedingJoinPoint.proceed();
         TypeHandler typeHandler = configuration.getTypeHandlerRegistry().getHandler(result);
-        Object realData = typeHandler.getData(result);
+        Object realData = typeHandler.unwrap(result);
         if(realData instanceof Collection){
-            new SemiBean4CollectionProcessor(configuration.getSemiBeanRegistry(), context).process((Collection) realData);
+            new SemiBean4CollectionProcessor(configuration.getSemiBeanRegistry(), context, conversionService).process((Collection) realData);
         }else{
-            new SemiBeanProcessor(configuration.getSemiBeanRegistry(), context).process(realData);
+            new SemiBeanProcessor(configuration.getSemiBeanRegistry(), context, conversionService).process(realData);
         }
-        typeHandler.setData(result, realData);
+        typeHandler.rewrap(result, realData);
         return result;
     }
 

@@ -2,7 +2,9 @@ package org.thewangzl.rpc.semi.handle;
 
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.convert.ConversionService;
 import org.thewangzl.rpc.semi.Ref;
 import org.thewangzl.rpc.semi.SemiBeanRegistry;
 import org.thewangzl.rpc.semi.util.CollectionUtil;
@@ -11,16 +13,29 @@ import org.thewangzl.rpc.semi.util.RpcUtils;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
+/**
+ *
+ */
 public class SemiBean4CollectionProcessor {
+
     private SemiBeanRegistry semiBeanRegistry;
 
     private ApplicationContext context;
 
-    public SemiBean4CollectionProcessor(SemiBeanRegistry semiBeanRegistry, ApplicationContext context) {
+    private ConversionService conversionService;
+
+    public SemiBean4CollectionProcessor(SemiBeanRegistry semiBeanRegistry, ApplicationContext context, ConversionService conversionService) {
         this.semiBeanRegistry = semiBeanRegistry;
         this.context = context;
+        this.conversionService = conversionService;
     }
 
+    /**
+     *
+     * @param domains
+     * @throws IllegalAccessException
+     * @throws InvocationTargetException
+     */
     public void process(Collection<?> domains) throws IllegalAccessException, InvocationTargetException {
         Set<Ref> refs = semiBeanRegistry.get(domains.iterator().next().getClass().getName());
         if(refs== null){
@@ -29,14 +44,14 @@ public class SemiBean4CollectionProcessor {
         for (Ref ref : refs) {
             Collection ids = getRefIds(domains, ref);
             Object feign = context.getBean(ref.getRpcClass());
-            Object[] args = RpcUtils.buildRpcMethodArgs(ref, ids);
+            Object[] args = RpcUtils.buildRpcMethodArgs(conversionService,ref.getArgs(), ref.getListMethod().getParameterTypes(), ref.getRefKeyIndex() , ids);
             Collection refValues = (Collection) ref.getListMethod().invoke(feign, args);
             this.setRef(domains,ref, refValues);
         }
     }
 
     private Collection getRefIds(Collection<?> domains, Ref ref) {
-        Collection ids = RpcUtils.instanceCollectionArgument(ref.getListMethod());
+        Collection ids = CollectionUtil.instanceCollectionArgument(ref.getListMethod());
         for(Object domain : domains) {
             BeanWrapper beanWrapper = new BeanWrapperImpl(domain);
             Object key = beanWrapper.getPropertyValue(ref.getField());
@@ -76,7 +91,8 @@ public class SemiBean4CollectionProcessor {
                 wrapper.setPropertyValue(field,newValues);
             }else if(propertyValue.getClass().getName().equals(ref.getRefClass())){
                 BeanWrapper propertyValueWrapper = new BeanWrapperImpl(propertyValue);
-                wrapper.setPropertyValue(field, refMap.get(propertyValueWrapper.getPropertyValue(ref.getRefKey())));
+                Object refId = propertyValueWrapper.getPropertyValue(ref.getRefKey());
+                wrapper.setPropertyValue(field, refMap.get(refId));
             }
         }
     }

@@ -16,10 +16,8 @@ import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
-import org.thewangzl.rpc.semi.annotation.RefKey;
-import org.thewangzl.rpc.semi.annotation.SemiBean;
-import org.thewangzl.rpc.semi.annotation.SemiProperty;
-import org.thewangzl.rpc.semi.type.WrappedType;
+import org.thewangzl.rpc.semi.annotation.*;
+import org.thewangzl.rpc.semi.type.WrapperType;
 import org.thewangzl.rpc.semi.util.ReflectUtil;
 
 import java.io.IOException;
@@ -27,8 +25,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 import static org.springframework.util.StringUtils.tokenizeToStringArray;
 
@@ -55,7 +52,7 @@ public class SemiConfigurationFactoryBean implements InitializingBean, Applicati
             configuration.getSemiBeanRegistry().put(clazz.getName(), refs);
         }
         if(StringUtils.hasText(typeHandlersPackage)) {
-            classes = scanClass(typeHandlersPackage, WrappedType.class);
+            classes = scanClass(typeHandlersPackage, WrapperType.class);
             for(Class clazz : classes){
                 configuration.getTypeHandlerRegistry().register(clazz);
             }
@@ -104,26 +101,11 @@ public class SemiConfigurationFactoryBean implements InitializingBean, Applicati
 
                 ref.setMethod(method);
                 ref.setListMethod(listMethod);
-                ref.setArgs(semiField.args());
-                Type type = ReflectUtil.getActualType(field.getGenericType());
-                if(type == null){
+                //
+                parseArg(field, ref);
+                parseRefKey(field, ref);
+                if(ref.getRefKey() == null){
                     log.error(clazz.getName() +"."+ field.getName()+" not support");
-                    continue;
-                }
-                Class<?> refClass = ClassUtils.getDefaultClassLoader().loadClass(type.getTypeName());
-                Field[] refTypeFields = refClass.getDeclaredFields();
-                boolean found = false;
-                for (Field refTypeField : refTypeFields) {
-                    RefKey refKey = refTypeField.getAnnotation(RefKey.class);
-                    if (refKey != null) {
-                        ref.setRefClass(field.getGenericType().getTypeName());
-                        ref.setRefKey(refTypeField.getName());
-                        found = true;
-                        break;
-                    }
-                }
-                if(!found){
-                    log.error(clazz.getName() +"."+ field.getName() +"not found refKey.");
                     continue;
                 }
                 refs.add(ref);
@@ -134,7 +116,39 @@ public class SemiConfigurationFactoryBean implements InitializingBean, Applicati
         return refs;
     }
 
-    private Method getMethod(Object rpcBean, String name) throws ClassNotFoundException {
+    private void parseArg(Field field, Ref ref) {
+        ExtArg[] extArgs = field.getAnnotationsByType(ExtArg.class);
+        if(extArgs != null){
+            for(ExtArg extArg : extArgs){
+                String value = extArg.value();
+                int index = extArg.index();
+                ArgMapping argMapping = new ArgMapping();
+                argMapping.setIndex(index);
+                argMapping.setValue(value);
+                ref.addArg(argMapping);
+            }
+        }
+    }
+
+    private void parseRefKey(Field field, Ref ref) throws ClassNotFoundException {
+        Type type = ReflectUtil.getActualType(field.getGenericType());
+        if(type == null){
+            return ;
+        }
+        Class<?> refClass = ClassUtils.getDefaultClassLoader().loadClass(type.getTypeName());
+        Field[] refTypeFields = refClass.getDeclaredFields();
+        for (Field refTypeField : refTypeFields) {
+            RefKey refKey = refTypeField.getAnnotation(RefKey.class);
+            if (refKey != null) {
+                ref.setRefClass(field.getGenericType().getTypeName());
+                ref.setRefKey(refTypeField.getName());
+                ref.setRefKeyIndex(refKey.index());
+                return;
+            }
+        }
+    }
+
+    private Method getMethod(Object rpcBean, String name){
         Method[] allOfMethods = rpcBean.getClass().getDeclaredMethods();
         for(Method method : allOfMethods) {
             if(method.getName().equals(name)) return method;
